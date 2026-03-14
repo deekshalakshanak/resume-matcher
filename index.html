@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ResumeMatch</title>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Playfair+Display:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:       #f4f2ee;
+  --white:    #ffffff;
+  --border:   #e2dfd8;
+  --text:     #1e1e1e;
+  --muted:    #8a8680;
+  --faint:    #eeebe4;
+  --blue:     #2f6fd4;
+  --blue-lt:  #eef3fc;
+  --green:    #2e7d52;
+  --green-lt: #ebf5ef;
+  --amber:    #b45309;
+  --amber-lt: #fef3e2;
+  --red:      #b91c1c;
+  --red-lt:   #fef2f2;
+  --purple:   #6d3fc0;
+  --cyan:     #0e7490;
+  --sidebar:  280px;
+  --radius:   10px;
+  --shadow:   0 2px 8px rgba(0,0,0,0.07);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: 'Lato', sans-serif;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top bar ── */
+.topbar {
+  height: 52px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
+  gap: 16px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+.topbar-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+.topbar-logo span { color: var(--blue); }
+.topbar-sep { width: 1px; height: 20px; background: var(--border); }
+.topbar-sub { font-size: 12px; color: var(--muted); }
+.topbar-steps { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.ts { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.ts.active { color: var(--blue); font-weight: 700; }
+.ts.done   { color: var(--green); }
+.ts-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+  background: var(--white); color: var(--muted);
+  transition: all 0.2s;
+}
+.ts.active .ts-num { border-color: var(--blue); color: var(--blue); background: var(--blue-lt); }
+.ts.done .ts-num   { border-color: var(--green); background: var(--green-lt); color: var(--green); }
+.ts-line { width: 28px; height: 1px; background: var(--border); }
+
+/* ── Main layout ── */
+.layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar);
+  flex-shrink: 0;
+  background: var(--white);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+/* Upload cards (stacked in sidebar) */
+.upload-card {
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 18px 14px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.2s, background 0.2s, transform 0.12s;
+  background: var(--bg);
+}
+.upload-card:hover { border-color: #aaa; background: var(--faint); transform: translateY(-1px); }
+.upload-card.loaded { border-style: solid; border-color: var(--green); background: var(--green-lt); }
+.upload-card input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.uc-check { display: none; position: absolute; top: 8px; right: 10px; font-size: 13px; }
+.upload-card.loaded .uc-check { display: block; }
+.uc-icon  { font-size: 22px; margin-bottom: 6px; display: block; }
+.uc-title { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.uc-hint  { font-size: 11px; color: var(--muted); }
+.uc-file  { font-size: 11px; color: var(--green); font-weight: 700; margin-top: 6px; display: none; word-break: break-all; }
+.upload-card.loaded .uc-file { display: block; }
+.upload-card.loaded .uc-hint { display: none; }
+
+/* Analyze button */
+.btn-analyze {
+  width: 100%;
+  padding: 10px;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-family: 'Lato', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.btn-analyze:hover:not(:disabled) { background: #2259b5; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(47,111,212,0.3); }
+.btn-analyze:disabled { background: #c0cfe8; cursor: not-allowed; }
+.btn-spinner {
+  display: none; width: 12px; height: 12px;
+  border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff;
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+}
+.btn-analyze.loading .btn-spinner { display: block; }
+@keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+
+.btn-reset {
+  width: 100%; padding: 8px;
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-family: 'Lato', sans-serif;
+  font-size: 12px; color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-reset:hover { border-color: #aaa; color: var(--text); }
+
+.error {
+  background: var(--red-lt); border: 1px solid #fca5a5;
+  color: var(--red); border-radius: var(--radius);
+  padding: 10px 12px; font-size: 12px; display: none; line-height: 1.5;
+}
+.error.show { display: block; }
+
+/* Sidebar score summary (after analysis) */
+.sidebar-score { display: none; text-align: center; padding: 12px 0; }
+.sidebar-score.show { display: block; }
+.ss-donut { position: relative; width: 90px; height: 90px; margin: 0 auto 10px; }
+.ss-donut svg { width: 90px; height: 90px; transform: rotate(-90deg); }
+.ss-ring-bg   { fill: none; stroke: var(--faint); stroke-width: 8; }
+.ss-ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; stroke-dasharray: 251; stroke-dashoffset: 251; transition: stroke-dashoffset 1.2s cubic-bezier(0.22,1,0.36,1), stroke 0.3s; }
+.ss-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.ss-num  { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 500; line-height: 1; }
+.ss-pct  { font-size: 9px; color: var(--muted); }
+.ss-verdict { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.ss-desc    { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* Mini metric bars in sidebar */
+.mini-metrics { display: flex; flex-direction: column; gap: 8px; }
+.mm-row { display: flex; flex-direction: column; gap: 3px; }
+.mm-top { display: flex; justify-content: space-between; font-size: 11px; }
+.mm-name  { color: var(--muted); }
+.mm-score { font-weight: 700; }
+.mm-track { height: 4px; background: var(--faint); border-radius: 2px; overflow: hidden; }
+.mm-fill  { height: 100%; border-radius: 2px; width: 0; transition: width 1s cubic-bezier(0.22,1,0.36,1); }
+
+/* ── Main panel ── */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Empty / placeholder state */
+.placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--muted);
+  text-align: center;
+}
+.placeholder-icon { font-size: 52px; opacity: 0.3; }
+.placeholder h2 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 400; color: var(--text); opacity: 0.4; }
+.placeholder p  { font-size: 13px; max-width: 320px; line-height: 1.6; opacity: 0.6; }
+
+/* Results panels */
+#results { display: none; flex-direction: column; gap: 20px; }
+#results.show { display: flex; animation: fadeUp 0.4s ease; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Section label */
+.panel-label {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 14px;
+}
+
+/* Card */
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 24px;
+}
+
+/* Charts row — 2 cards side by side */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+/* Metric table in main panel */
+.metric-table { width: 100%; border-collapse: collapse; }
+.metric-table tr { border-bottom: 1px solid var(--faint); transition: background 0.12s; cursor: default; }
+.metric-table tr:last-child { border-bottom: none; }
+.metric-table tr:hover { background: var(--faint); }
+.metric-table td { padding: 11px 0; vertical-align: middle; }
+.mt-name  { font-size: 13px; color: var(--text); width: 160px; padding-left: 4px !important; }
+.mt-bar   { padding: 0 16px !important; }
+.mt-track { height: 7px; background: var(--faint); border-radius: 4px; overflow: hidden; }
+.mt-fill  { height: 100%; border-radius: 4px; width: 0; transition: width 1s cubic-bezier(0.22,1,0.36,1); }
+.mt-score { font-size: 14px; font-weight: 700; width: 50px; text-align: right; }
+.mt-weight { font-size: 11px; color: var(--muted); width: 56px; text-align: right; padding-right: 4px !important; }
+.mt-tip { font-size: 11px; color: var(--muted); font-weight: 300; display: block; margin-top: 1px; }
+
+.chart-wrap { position: relative; height: 200px; }
+
+/* Keyword section */
+.kw-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.kw-toolbar-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.kw-tab {
+  padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  border: 1.5px solid var(--border); background: var(--white); color: var(--muted);
+  cursor: pointer; transition: all 0.15s; letter-spacing: 0.03em;
+}
+.kw-tab:hover { border-color: var(--blue); color: var(--blue); }
+.kw-tab.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.kw-search {
+  margin-left: auto; padding: 5px 10px;
+  border: 1px solid var(--border); border-radius: 6px;
+  font-family: 'Lato', sans-serif; font-size: 12px; color: var(--text);
+  background: var(--bg); outline: none; width: 160px;
+  transition: border-color 0.15s;
+}
+.kw-search:focus { border-color: var(--blue); }
+
+.kw-two { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.kw-col-title {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
+}
+.kw-count { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+.kw-count.g { background: var(--green-lt); color: var(--green); }
+.kw-count.r { background: var(--red-lt); color: var(--red); }
+.kw-tags { display: flex; flex-wrap: wrap; gap: 6px; max-height: 160px; overflow-y: auto; }
+.kw-tag {
+  font-size: 11px; padding: 4px 10px; border-radius: 4px;
+  cursor: default; transition: transform 0.1s, opacity 0.2s;
+}
+.kw-tag:hover { transform: scale(1.06); }
+.kw-tag.m { background: var(--green-lt); color: var(--green); border: 1px solid #a7f3c0; }
+.kw-tag.x { background: var(--red-lt);   color: var(--red);   border: 1px solid #fca5a5; }
+.kw-tag.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo">Resume<span>Match</span></div>
+  <div class="topbar-sep"></div>
+  <div class="topbar-sub">NLP-powered fit analysis</div>
+  <div class="topbar-steps">
+    <div class="ts active" id="st1"><div class="ts-num">1</div><span>Upload</span></div>
+    <div class="ts-line"></div>
+    <div class="ts" id="st2"><div class="ts-num">2</div><span>Analyze</span></div>
+    <div class="ts-line"></div>
+    <div class="ts" id="st3"><div class="ts-num">3</div><span>Results</span></div>
+  </div>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Upload -->
+    <div>
+      <div class="sidebar-section-label">1 — Upload files</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="upload-card" id="card-resume">
+          <input type="file" id="file-resume" accept=".txt"/>
+          <span class="uc-check">✅</span>
+          <span class="uc-icon">📄</span>
+          <div class="uc-title">Resume</div>
+          <div class="uc-hint">Click or drag .txt</div>
+          <div class="uc-file" id="fn-resume"></div>
+        </div>
+        <div class="upload-card" id="card-jd">
+          <input type="file" id="file-jd" accept=".txt"/>
+          <span class="uc-check">✅</span>
+          <span class="uc-icon">💼</span>
+          <div class="uc-title">Job Description</div>
+          <div class="uc-hint">Click or drag .txt</div>
+          <div class="uc-file" id="fn-jd"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analyze -->
+    <div>
+      <div class="sidebar-section-label">2 — Run analysis</div>
+      <button class="btn-analyze" id="btn" disabled onclick="analyze()">
+        Analyze match
+        <span class="btn-spinner"></span>
+      </button>
+    </div>
+
+    <div class="error" id="err"></div>
+
+    <!-- Score summary (post-analysis) -->
+    <div class="sidebar-score" id="sidebar-score">
+      <div class="sidebar-section-label" style="text-align:left">Overall score</div>
+      <div class="ss-donut">
+        <svg viewBox="0 0 90 90">
+          <circle class="ss-ring-bg"   cx="45" cy="45" r="40"/>
+          <circle class="ss-ring-fill" cx="45" cy="45" r="40" id="ss-fill"/>
+        </svg>
+        <div class="ss-inner">
+          <span class="ss-num" id="ss-num">—</span>
+          <span class="ss-pct">/ 100</span>
+        </div>
+      </div>
+      <div class="ss-verdict" id="ss-verdict">—</div>
+      <div class="ss-desc"    id="ss-desc"></div>
+
+      <div style="margin-top:16px;">
+        <div class="mini-metrics" id="mini-metrics"></div>
+      </div>
+    </div>
+
+    <!-- Reset -->
+    <div id="reset-wrap" style="display:none; margin-top:auto;">
+      <button class="btn-reset" onclick="resetAll()">↩ Start over</button>
+    </div>
+
+  </div>
+
+  <!-- MAIN PANEL -->
+  <div class="main" id="main-panel">
+
+    <!-- Placeholder -->
+    <div class="placeholder" id="placeholder">
+      <div class="placeholder-icon">📊</div>
+      <h2>No analysis yet</h2>
+      <p>Upload your resume and a job description in the sidebar, then click <strong>Analyze match</strong> to see your results here.</p>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+
+      <!-- Charts row -->
+      <div class="two-col">
+        <div class="card">
+          <div class="panel-label">Radar view</div>
+          <div class="chart-wrap"><canvas id="radarChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="panel-label">Score by resume section</div>
+          <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Metric breakdown -->
+      <div class="card">
+        <div class="panel-label">Score breakdown</div>
+        <table class="metric-table">
+          <tr>
+            <td class="mt-name">Semantic similarity<span class="mt-tip">Meaning-level match via Sentence Transformers</span></td>
+            <td class="mt-bar"><div class="mt-track"><div class="mt-fill" id="mf-sem" style="background:var(--blue)"></div></div></td>
+            <td class="mt-score" id="ms-sem" style="color:var(--blue)">—</td>
+            <td class="mt-weight">60% wt.</td>
+          </tr>
+          <tr>
+            <td class="mt-name">TF-IDF similarity<span class="mt-tip">Term-frequency match via Scikit-learn</span></td>
+            <td class="mt-bar"><div class="mt-track"><div class="mt-fill" id="mf-tfidf" style="background:var(--purple)"></div></div></td>
+            <td class="mt-score" id="ms-tfidf" style="color:var(--purple)">—</td>
+            <td class="mt-weight">20% wt.</td>
+          </tr>
+          <tr>
+            <td class="mt-name">Keyword overlap<span class="mt-tip">JD keywords found in your resume</span></td>
+            <td class="mt-bar"><div class="mt-track"><div class="mt-fill" id="mf-kw" style="background:var(--cyan)"></div></div></td>
+            <td class="mt-score" id="ms-kw" style="color:var(--cyan)">—</td>
+            <td class="mt-weight">20% wt.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Keywords -->
+      <div class="card">
+        <div class="kw-toolbar">
+          <span class="kw-toolbar-label">Keywords</span>
+          <button class="kw-tab active" onclick="filterKw('all',this)">All</button>
+          <button class="kw-tab" onclick="filterKw('matched',this)">Matched</button>
+          <button class="kw-tab" onclick="filterKw('missing',this)">Missing</button>
+          <input class="kw-search" id="kw-search" type="text" placeholder="Search keywords…" oninput="searchKw(this.value)"/>
+        </div>
+        <div class="kw-two">
+          <div id="col-matched">
+            <div class="kw-col-title">
+              Matched
+              <span class="kw-count g" id="cnt-m">0</span>
+            </div>
+            <div class="kw-tags" id="kw-matched"></div>
+          </div>
+          <div id="col-missing">
+            <div class="kw-col-title">
+              Missing from resume
+              <span class="kw-count r" id="cnt-x">0</span>
+            </div>
+            <div class="kw-tags" id="kw-missing"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /#results -->
+  </div><!-- /.main -->
+</div><!-- /.layout -->
+
+<script>
+const API = 'http://localhost:5000/analyze';
+let resumeFile = null, jdFile = null;
+let radarInst = null, barInst = null;
+
+/* ── File upload ── */
+function setupCard(cardId, inputId, fnId, onFile) {
+  const card  = document.getElementById(cardId);
+  const input = document.getElementById(inputId);
+  const fn    = document.getElementById(fnId);
+
+  const handle = f => {
+    if (!f) return;
+    fn.textContent = f.name;
+    card.classList.add('loaded');
+    onFile(f);
+    checkReady();
+  };
+
+  input.addEventListener('change', () => handle(input.files[0]));
+  card.addEventListener('dragover',  e => { e.preventDefault(); card.style.borderColor='#888'; });
+  card.addEventListener('dragleave', () => { card.style.borderColor=''; });
+  card.addEventListener('drop', e => { e.preventDefault(); card.style.borderColor=''; handle(e.dataTransfer.files[0]); });
+}
+
+setupCard('card-resume','file-resume','fn-resume', f => resumeFile = f);
+setupCard('card-jd',    'file-jd',    'fn-jd',    f => jdFile     = f);
+
+function checkReady() {
+  document.getElementById('btn').disabled = !(resumeFile && jdFile);
+  setStep(2);
+}
+
+/* ── Steps ── */
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('st'+i);
+    el.classList.remove('active','done');
+    if (i <  n) el.classList.add('done');
+    if (i === n) el.classList.add('active');
+  });
+}
+
+/* ── Keyword filter + search ── */
+let kwMode = 'all';
+
+function filterKw(mode, btn) {
+  kwMode = mode;
+  document.querySelectorAll('.kw-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('col-matched').style.display = (mode === 'missing')  ? 'none' : '';
+  document.getElementById('col-missing').style.display = (mode === 'matched') ? 'none' : '';
+  searchKw(document.getElementById('kw-search').value);
+}
+
+function searchKw(query) {
+  const q = query.toLowerCase().trim();
+  document.querySelectorAll('.kw-tag').forEach(tag => {
+    const text = tag.textContent.toLowerCase();
+    tag.classList.toggle('hidden', q.length > 0 && !text.includes(q));
+  });
+}
+
+/* ── Charts ── */
+function drawRadar(sem, tfi, kw) {
+  if (radarInst) radarInst.destroy();
+  radarInst = new Chart(document.getElementById('radarChart'), {
+    type: 'radar',
+    data: {
+      labels: ['Semantic','TF-IDF','Keyword'],
+      datasets: [{
+        data: [sem, tfi, kw],
+        backgroundColor: 'rgba(47,111,212,0.09)',
+        borderColor: '#2f6fd4', borderWidth: 2,
+        pointBackgroundColor: '#2f6fd4', pointRadius: 4, pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: c => ' '+c.raw+'%' } } },
+      scales: { r: { min:0, max:100, ticks:{display:false}, grid:{color:'#eeebe4'}, angleLines:{color:'#eeebe4'}, pointLabels:{color:'#8a8680', font:{size:12,family:"'Lato',sans-serif"}} } }
+    }
+  });
+}
+
+function drawBar(sections) {
+  if (barInst) barInst.destroy();
+  const labels = Object.keys(sections);
+  const values = Object.values(sections).map(v => Math.round(v));
+  const pal = ['#2f6fd4','#6d3fc0','#0e7490','#2e7d52'];
+  barInst = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: labels.length ? labels : ['No sections detected'],
+      datasets: [{ data: labels.length ? values:[0], backgroundColor: labels.map((_,i)=>pal[i]||'#ccc'), borderRadius:5, borderSkipped:false }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: c=>' '+c.raw+'%' } } },
+      scales:{
+        x:{ grid:{display:false}, ticks:{color:'#8a8680', font:{size:12,family:"'Lato',sans-serif"}} },
+        y:{ min:0, max:100, grid:{color:'#eeebe4'}, ticks:{color:'#bbb', font:{size:11}, callback:v=>v+'%'} }
+      }
+    }
+  });
+}
+
+/* ── Render results ── */
+function renderResults(r) {
+  const c   = Math.round(r.composite_score);
+  const sem = Math.round(r.semantic_score);
+  const tfi = Math.round(r.tfidf_score);
+  const kw  = Math.round(r.keyword_overlap.overlap_percent);
+
+  const col = c >= 65 ? '#2e7d52' : c >= 40 ? '#b45309' : '#b91c1c';
+
+  // Sidebar donut
+  const circ = 2 * Math.PI * 40; // 251.3
+  const fill = document.getElementById('ss-fill');
+  fill.style.stroke = col;
+  fill.setAttribute('stroke-dasharray', circ);
+  fill.setAttribute('stroke-dashoffset', circ);
+  setTimeout(() => { fill.style.strokeDashoffset = circ - (c / 100) * circ; }, 80);
+
+  // Counter
+  let cur = 0;
+  const ticker = setInterval(() => {
+    cur = Math.min(cur + Math.ceil(c/25), c);
+    document.getElementById('ss-num').textContent = cur;
+    document.getElementById('ss-num').style.color = col;
+    if (cur >= c) clearInterval(ticker);
+  }, 35);
+
+  // Verdict
+  const [verdict, desc] = c >= 65
+    ? ['Strong match',   'Your resume aligns well with this role.']
+    : c >= 40
+    ? ['Moderate match', 'Partial alignment. Tailor your skills section.']
+    : ['Low match',      'Significant gaps. Review the missing keywords.'];
+
+  document.getElementById('ss-verdict').textContent = verdict;
+  document.getElementById('ss-verdict').style.color  = col;
+  document.getElementById('ss-desc').textContent     = desc;
+
+  // Mini metric bars (sidebar)
+  const mm = document.getElementById('mini-metrics');
+  mm.innerHTML = [
+    { name:'Semantic', val:sem, color:'#2f6fd4' },
+    { name:'TF-IDF',   val:tfi, color:'#6d3fc0' },
+    { name:'Keyword',  val:kw,  color:'#0e7490'  }
+  ].map(m => `
+    <div class="mm-row">
+      <div class="mm-top">
+        <span class="mm-name">${m.name}</span>
+        <span class="mm-score" style="color:${m.color}">${m.val}%</span>
+      </div>
+      <div class="mm-track"><div class="mm-fill" style="background:${m.color};width:${m.val}%" data-target="${m.val}"></div></div>
+    </div>
+  `).join('');
+
+  // Main metric bars
+  ['sem','tfidf','kw'].forEach((k,i) => {
+    const vals = [sem, tfi, kw];
+    document.getElementById('ms-'+k).textContent = vals[i]+'%';
+  });
+  setTimeout(() => {
+    document.getElementById('mf-sem').style.width   = sem+'%';
+    document.getElementById('mf-tfidf').style.width = tfi+'%';
+    document.getElementById('mf-kw').style.width    = kw+'%';
+  }, 200);
+
+  // Charts
+  drawRadar(sem, tfi, kw);
+  drawBar(r.section_scores || {});
+
+  // Keywords
+  const matched = r.keyword_overlap.matched || [];
+  const missing = r.keyword_overlap.missing || [];
+  document.getElementById('kw-matched').innerHTML = matched.map(k=>`<span class="kw-tag m">${k}</span>`).join('');
+  document.getElementById('kw-missing').innerHTML = missing.map(k=>`<span class="kw-tag x">${k}</span>`).join('');
+  document.getElementById('cnt-m').textContent = matched.length;
+  document.getElementById('cnt-x').textContent = missing.length;
+
+  // Show results
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('results').classList.add('show');
+  document.getElementById('sidebar-score').classList.add('show');
+  document.getElementById('reset-wrap').style.display = 'block';
+  setStep(3);
+}
+
+/* ── Analyze ── */
+async function analyze() {
+  const btn = document.getElementById('btn');
+  const err = document.getElementById('err');
+  err.classList.remove('show');
+  btn.classList.add('loading');
+  btn.textContent = 'Analyzing…';
+  btn.disabled = true;
+  const sp = document.createElement('span');
+  sp.className = 'btn-spinner';
+  btn.appendChild(sp);
+  setStep(2);
+
+  try {
+    const form = new FormData();
+    form.append('resume', resumeFile);
+    form.append('jd', jdFile);
+    const res  = await fetch(API, { method:'POST', body:form });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Server error');
+    renderResults(data);
+  } catch(e) {
+    err.textContent = (e.message.includes('fetch')||e.message.includes('Failed'))
+      ? 'Cannot reach backend. Run python app.py and open http://localhost:5000'
+      : 'Error: '+e.message;
+    err.classList.add('show');
+    setStep(1);
+  } finally {
+    btn.classList.remove('loading');
+    btn.textContent = 'Analyze match';
+    btn.disabled = false;
+    btn.appendChild(Object.assign(document.createElement('span'),{className:'btn-spinner'}));
+  }
+}
+
+/* ── Reset ── */
+function resetAll() {
+  resumeFile = null; jdFile = null;
+  ['card-resume','card-jd'].forEach(id => document.getElementById(id).classList.remove('loaded'));
+  ['fn-resume','fn-jd'].forEach(id => document.getElementById(id).textContent = '');
+  ['file-resume','file-jd'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('btn').disabled = true;
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('sidebar-score').classList.remove('show');
+  document.getElementById('reset-wrap').style.display = 'none';
+  document.getElementById('placeholder').style.display = '';
+  document.getElementById('err').classList.remove('show');
+  setStep(1);
+}
+</script>
+</body>
+</html>
