@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Resume–Job Description Matcher
 
 NLP-powered matching system using **Sentence Transformers** + **Scikit-learn**.
